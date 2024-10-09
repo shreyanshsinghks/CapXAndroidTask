@@ -16,7 +16,7 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 class StockViewModel : ViewModel() {
-    var searchResults by mutableStateOf<List<StockMatch>>(emptyList())
+    var stockQuote by mutableStateOf<GlobalQuote?>(null)
         private set
 
     var isLoading by mutableStateOf(false)
@@ -29,28 +29,22 @@ class StockViewModel : ViewModel() {
 
     private val apiService = Retrofit.Builder()
         .baseUrl("https://www.alphavantage.co/")
-        .addConverterFactory(ScalarsConverterFactory.create()) // Only Scalars needed for string response
+        .addConverterFactory(ScalarsConverterFactory.create())
         .build()
         .create(AlphaVantageApiService::class.java)
 
-    fun searchStocks(keywords: String) {
+    fun searchStockQuote(symbol: String) {
         viewModelScope.launch {
             isLoading = true
             error = null
-            searchResults = emptyList()
+            stockQuote = null
             try {
-                Log.d("StockViewModel", "Searching for stocks with keywords: $keywords")
-                val responseString = apiService.searchSymbols(keywords)
+                Log.d("StockViewModel", "Fetching quote for symbol: $symbol")
+                val responseString = apiService.getGlobalQuote(symbol)
                 Log.d("StockViewModel", "API Response: $responseString")
 
-                val stockMatchResponse = json.decodeFromString<StockMatchResponse>(responseString)
-
-                // Check if bestMatches is null before proceeding
-                if (!stockMatchResponse.bestMatches.isNullOrEmpty()) {
-                    searchResults = stockMatchResponse.bestMatches
-                } else {
-                    error = "No results found for '$keywords'"
-                }
+                val globalQuoteResponse = json.decodeFromString<GlobalQuoteResponse>(responseString)
+                stockQuote = globalQuoteResponse.globalQuote
             } catch (e: Exception) {
                 error = "Failed to fetch stock data: ${e.message}"
                 Log.e("StockViewModel", "Error fetching stock data", e)
@@ -61,37 +55,44 @@ class StockViewModel : ViewModel() {
     }
 }
 
+
 @Serializable
-data class StockMatchResponse(
-    val bestMatches: List<StockMatch>? // Make this nullable
+data class GlobalQuoteResponse(
+    @kotlinx.serialization.SerialName("Global Quote")
+    val globalQuote: GlobalQuote
 )
 
 @Serializable
-data class StockMatch(
-    @kotlinx.serialization.SerialName("1. symbol")
+data class GlobalQuote(
+    @kotlinx.serialization.SerialName("01. symbol")
     val symbol: String,
-    @kotlinx.serialization.SerialName("2. name")
-    val name: String,
-    @kotlinx.serialization.SerialName("3. type")
-    val type: String,
-    @kotlinx.serialization.SerialName("4. region")
-    val region: String,
-    @kotlinx.serialization.SerialName("5. marketOpen")
-    val marketOpen: String,
-    @kotlinx.serialization.SerialName("6. marketClose")
-    val marketClose: String,
-    @kotlinx.serialization.SerialName("7. timezone")
-    val timezone: String,
-    @kotlinx.serialization.SerialName("8. currency")
-    val currency: String,
-    @kotlinx.serialization.SerialName("9. matchScore")
-    val matchScore: String
+    @kotlinx.serialization.SerialName("02. open")
+    val open: String,
+    @kotlinx.serialization.SerialName("03. high")
+    val high: String,
+    @kotlinx.serialization.SerialName("04. low")
+    val low: String,
+    @kotlinx.serialization.SerialName("05. price")
+    val price: String,
+    @kotlinx.serialization.SerialName("06. volume")
+    val volume: String,
+    @kotlinx.serialization.SerialName("07. latest trading day")
+    val latestTradingDay: String,
+    @kotlinx.serialization.SerialName("08. previous close")
+    val previousClose: String,
+    @kotlinx.serialization.SerialName("09. change")
+    val change: String,
+    @kotlinx.serialization.SerialName("10. change percent")
+    val changePercent: String
 )
+
+
 
 interface AlphaVantageApiService {
-    @GET("query?function=SYMBOL_SEARCH")
-    suspend fun searchSymbols(
-        @Query("keywords") keywords: String,
+    @GET("query?function=GLOBAL_QUOTE")
+    suspend fun getGlobalQuote(
+        @Query("symbol") symbol: String,
         @Query("apikey") apiKey: String = API_KEY
-    ): String // Change return type to String to match ScalarsConverterFactory
+    ): String
 }
+
